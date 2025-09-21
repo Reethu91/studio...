@@ -5,9 +5,6 @@ import {
   useState,
   useRef,
   useEffect,
-  useCallback,
-  type Dispatch,
-  type SetStateAction,
 } from "react";
 import {
   Card,
@@ -56,7 +53,7 @@ export default function EmotionCaptureCard({
 }: EmotionCaptureCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [hasCameraPermission, setHasCameraPermission] = useState(true);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -136,7 +133,7 @@ export default function EmotionCaptureCard({
             muted
             className="w-full h-full object-cover"
           />
-          {!hasCameraPermission && (
+          {hasCameraPermission === false && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
               <Alert variant="destructive" className="w-auto">
                 <Camera className="size-4" />
@@ -145,6 +142,11 @@ export default function EmotionCaptureCard({
                   Please allow camera access to use this feature.
                 </AlertDescription>
               </Alert>
+            </div>
+          )}
+           {hasCameraPermission === null && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                <LoaderCircle className="size-8 animate-spin text-primary" />
             </div>
           )}
         </div>
