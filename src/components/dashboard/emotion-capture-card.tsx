@@ -5,6 +5,7 @@ import {
   useState,
   useRef,
   useEffect,
+  useCallback,
 } from "react";
 import {
   Card,
@@ -27,11 +28,10 @@ import {
   Annoyed,
   Laugh,
   ShieldAlert,
+  VideoOff,
 } from "lucide-react";
 import type { RecognizeUserEmotionOutput } from "@/ai/flows/recognize-user-emotion";
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-
 
 type EmotionCaptureCardProps = {
   isLoading: boolean;
@@ -48,6 +48,7 @@ const emotionIcons: { [key: string]: React.ReactNode } = {
   fearful: <Annoyed className="size-5 text-purple-400" />,
 };
 
+type CameraStatus = 'idle' | 'requesting' | 'streaming' | 'denied';
 
 export default function EmotionCaptureCard({
   isLoading,
@@ -56,42 +57,47 @@ export default function EmotionCaptureCard({
 }: EmotionCaptureCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [cameraStatus, setCameraStatus] = useState<CameraStatus>('idle');
   const { toast } = useToast();
 
-  useEffect(() => {
-    const getCameraPermission = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({video: true});
-        setHasCameraPermission(true);
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (error) {
-        console.error('Error accessing camera:', error);
-        setHasCameraPermission(false);
-        toast({
-          variant: 'destructive',
-          title: 'Camera Access Denied',
-          description: 'Please enable camera permissions in your browser settings to use this app.',
-        });
+  const enableCamera = useCallback(async () => {
+    if (cameraStatus !== 'idle' && cameraStatus !== 'denied') return;
+    
+    setCameraStatus('requesting');
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          setCameraStatus('streaming');
+        };
+      } else {
+        stream.getTracks().forEach(track => track.stop());
+        setCameraStatus('denied');
       }
-    };
+    } catch (error) {
+      console.error("Camera access error:", error);
+      setCameraStatus('denied');
+      toast({
+        variant: 'destructive',
+        title: 'Camera Access Denied',
+        description: 'Please enable camera permissions in your browser settings.',
+      });
+    }
+  }, [cameraStatus, toast]);
 
-    getCameraPermission();
-
-     return () => {
+  useEffect(() => {
+    return () => {
       if (videoRef.current && videoRef.current.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [toast]);
-
+  }, []);
 
   const handleTakePicture = () => {
-    if (videoRef.current && canvasRef.current && hasCameraPermission) {
+    if (videoRef.current && canvasRef.current && cameraStatus === 'streaming') {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       canvas.width = video.videoWidth;
@@ -104,6 +110,70 @@ export default function EmotionCaptureCard({
       }
     }
   };
+
+  const renderVideoOverlay = () => {
+    switch (cameraStatus) {
+      case 'idle':
+        return (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 p-4 text-center">
+            <VideoOff className="size-10 text-muted-foreground mb-4" />
+            <p className="text-white font-medium">Camera is off</p>
+            <p className="text-sm text-muted-foreground">Click below to enable your camera.</p>
+          </div>
+        );
+      case 'requesting':
+        return (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 p-4 text-center">
+            <LoaderCircle className="size-10 animate-spin text-primary mb-4" />
+            <p className="text-white">Requesting camera access...</p>
+            <p className="text-sm text-muted-foreground">Please allow permission in your browser.</p>
+          </div>
+        );
+      case 'denied':
+        return (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/90 p-4 text-center">
+            <ShieldAlert className="size-10 text-destructive-foreground mb-4" />
+            <h3 className="text-lg font-bold text-destructive-foreground">Camera Access Denied</h3>
+            <p className="text-sm text-destructive-foreground/80 mt-2">
+              You must grant camera permission in your browser's site settings to use this feature. You may need to refresh the page after granting permission.
+            </p>
+          </div>
+        );
+      case 'streaming':
+        return null;
+    }
+  };
+  
+  const renderFooterButton = () => {
+    switch (cameraStatus) {
+      case 'idle':
+      case 'denied':
+        return (
+          <Button onClick={enableCamera} className="w-full" disabled={cameraStatus === 'denied'}>
+            <Camera className="mr-2" />
+            {cameraStatus === 'denied' ? 'Permission Denied' : 'Enable Camera'}
+          </Button>
+        );
+      case 'requesting':
+         return (
+          <Button disabled className="w-full">
+            <LoaderCircle className="mr-2 animate-spin" />
+            Waiting for Permission...
+          </Button>
+        );
+      case 'streaming':
+        return (
+          <Button
+            onClick={handleTakePicture}
+            disabled={isLoading}
+            className="w-full"
+          >
+            <ScanFace className="mr-2" />
+            {isLoading ? "Scanning..." : "Scan Emotion"}
+          </Button>
+        );
+    }
+  }
 
 
   return (
@@ -121,27 +191,12 @@ export default function EmotionCaptureCard({
       </CardHeader>
       <CardContent className="flex-grow flex flex-col items-center justify-center">
         <div className="w-full aspect-video bg-secondary rounded-md flex items-center justify-center relative overflow-hidden">
-            <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+            <video ref={videoRef} className={`w-full h-full object-cover ${cameraStatus !== 'streaming' ? 'hidden' : ''}`} autoPlay muted playsInline />
             <canvas ref={canvasRef} className="hidden" />
-
-            {hasCameraPermission === null && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 p-4 text-center">
-                  <LoaderCircle className="size-10 animate-spin text-primary mb-4" />
-                  <p className="text-white">Requesting camera access...</p>
-              </div>
-            )}
+            {renderVideoOverlay()}
         </div>
-        {hasCameraPermission === false && (
-            <Alert variant="destructive" className="mt-4">
-              <ShieldAlert className="h-4 w-4" />
-              <AlertTitle>Camera Access Required</AlertTitle>
-              <AlertDescription>
-                Please allow camera access in your browser settings to use this feature. You may need to refresh the page after granting permission.
-              </AlertDescription>
-            </Alert>
-        )}
       </CardContent>
-      <CardFooter className="flex-col !pt-0 gap-4">
+      <CardFooter className="flex-col !pt-4 gap-4">
         <div className="w-full h-16 flex items-center justify-center rounded-lg bg-secondary/50 p-4">
           {isLoading ? (
             <div className="flex items-center gap-2 text-primary">
@@ -163,19 +218,12 @@ export default function EmotionCaptureCard({
             </div>
           ) : (
             <span className="text-muted-foreground">
-              {hasCameraPermission ? 'Ready to scan' : 'Camera permission needed'}
+              {cameraStatus === 'streaming' ? 'Ready to scan' : 'Camera permission needed'}
             </span>
           )}
         </div>
 
-        <Button
-          onClick={handleTakePicture}
-          disabled={isLoading || !hasCameraPermission}
-          className="w-full"
-        >
-          <ScanFace className="mr-2" />
-          {isLoading ? "Scanning..." : "Scan Emotion"}
-        </Button>
+        {renderFooterButton()}
       </CardFooter>
     </Card>
   );
