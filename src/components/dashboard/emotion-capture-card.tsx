@@ -78,11 +78,7 @@ export default function EmotionCaptureCard({
       } catch (error) {
         console.error("Error accessing camera:", error);
         setHasCameraPermission(false);
-        toast({
-          variant: "destructive",
-          title: "Camera Access Denied",
-          description: "Please enable camera permissions in your browser settings.",
-        });
+        // The toast is good, but the main UI should reflect the state.
       }
     };
 
@@ -134,17 +130,17 @@ export default function EmotionCaptureCard({
             className="w-full h-full object-cover"
           />
           {hasCameraPermission === false && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 p-4 text-center">
-              <ShieldAlert className="size-12 text-destructive mb-4" />
-              <h3 className="text-lg font-bold text-destructive-foreground">Camera Access Denied</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Please grant camera permissions in your browser settings to use this feature.
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 p-4 text-center">
+              <ShieldAlert className="size-16 text-destructive mb-4" />
+              <h3 className="text-xl font-bold text-white">Camera Access Denied</h3>
+              <p className="text-md text-muted-foreground mt-2">
+                EmotiGuard needs camera access. Please grant permission in your browser's address bar and refresh the page.
               </p>
             </div>
           )}
            {hasCameraPermission === null && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                <LoaderCircle className="size-8 animate-spin text-primary" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                <LoaderCircle className="size-10 animate-spin text-primary" />
             </div>
           )}
         </div>
