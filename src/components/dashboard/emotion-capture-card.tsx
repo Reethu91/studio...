@@ -5,7 +5,6 @@ import {
   useState,
   useRef,
   useEffect,
-  useCallback,
 } from "react";
 import {
   Card,
@@ -28,12 +27,11 @@ import {
   Annoyed,
   Laugh,
   ShieldAlert,
-  Video,
-  VideoOff,
 } from "lucide-react";
 import type { RecognizeUserEmotionOutput } from "@/ai/flows/recognize-user-emotion";
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+
 
 type EmotionCaptureCardProps = {
   isLoading: boolean;
@@ -63,30 +61,27 @@ export default function EmotionCaptureCard({
 
   useEffect(() => {
     const getCameraPermission = async () => {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        toast({
-          variant: "destructive",
-          title: "Camera Not Supported",
-          description: "Your browser does not support camera access.",
-        });
-        setHasCameraPermission(false);
-        return;
-      }
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({video: true});
+        setHasCameraPermission(true);
+
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
-        setHasCameraPermission(true);
       } catch (error) {
-        console.error("Error accessing camera:", error);
+        console.error('Error accessing camera:', error);
         setHasCameraPermission(false);
+        toast({
+          variant: 'destructive',
+          title: 'Camera Access Denied',
+          description: 'Please enable camera permissions in your browser settings to use this app.',
+        });
       }
     };
 
     getCameraPermission();
 
-    return () => {
+     return () => {
       if (videoRef.current && videoRef.current.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach((track) => track.stop());
@@ -126,30 +121,25 @@ export default function EmotionCaptureCard({
       </CardHeader>
       <CardContent className="flex-grow flex flex-col items-center justify-center">
         <div className="w-full aspect-video bg-secondary rounded-md flex items-center justify-center relative overflow-hidden">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover"
-          />
-          {hasCameraPermission === false && (
-             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 p-4 text-center">
-                <ShieldAlert className="size-16 text-destructive mb-4" />
-                <h3 className="text-xl font-bold text-white">Camera Access Denied</h3>
-                <p className="text-md text-muted-foreground mt-2 max-w-sm">
-                    To use this feature, you must allow camera access. Please click the camera icon in your browser's address bar and grant permission. You may need to refresh the page.
-                </p>
-             </div>
-          )}
-           {hasCameraPermission === null && (
-             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 p-4 text-center">
-                <LoaderCircle className="size-10 animate-spin text-primary mb-4" />
-                <p className="text-white">Requesting camera access...</p>
-             </div>
-           )}
+            <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+            <canvas ref={canvasRef} className="hidden" />
+
+            {hasCameraPermission === null && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 p-4 text-center">
+                  <LoaderCircle className="size-10 animate-spin text-primary mb-4" />
+                  <p className="text-white">Requesting camera access...</p>
+              </div>
+            )}
         </div>
-        <canvas ref={canvasRef} className="hidden" />
+        {hasCameraPermission === false && (
+            <Alert variant="destructive" className="mt-4">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertTitle>Camera Access Required</AlertTitle>
+              <AlertDescription>
+                Please allow camera access in your browser settings to use this feature. You may need to refresh the page after granting permission.
+              </AlertDescription>
+            </Alert>
+        )}
       </CardContent>
       <CardFooter className="flex-col !pt-0 gap-4">
         <div className="w-full h-16 flex items-center justify-center rounded-lg bg-secondary/50 p-4">
