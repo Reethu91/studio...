@@ -5,6 +5,7 @@ import {
   useState,
   useRef,
   useEffect,
+  useCallback,
 } from "react";
 import {
   Card,
@@ -27,10 +28,11 @@ import {
   Annoyed,
   Laugh,
   ShieldAlert,
+  Video,
+  VideoOff,
 } from "lucide-react";
 import type { RecognizeUserEmotionOutput } from "@/ai/flows/recognize-user-emotion";
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type EmotionCaptureCardProps = {
   isLoading: boolean;
@@ -47,6 +49,8 @@ const emotionIcons: { [key: string]: React.ReactNode } = {
   fearful: <Annoyed className="size-5 text-purple-400" />,
 };
 
+type CameraStatus = "idle" | "requesting" | "streaming" | "denied" | "error";
+
 export default function EmotionCaptureCard({
   isLoading,
   emotionResult,
@@ -54,46 +58,53 @@ export default function EmotionCaptureCard({
 }: EmotionCaptureCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [cameraStatus, setCameraStatus] = useState<CameraStatus>("idle");
   const { toast } = useToast();
 
+  const startCamera = useCallback(async () => {
+    if (cameraStatus === 'streaming') return;
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.error("Camera not supported by this browser.");
+      setCameraStatus("error");
+      toast({
+        variant: "destructive",
+        title: "Camera Not Supported",
+        description: "Your browser does not support camera access.",
+      });
+      return;
+    }
+    setCameraStatus("requesting");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setCameraStatus("streaming");
+    } catch (error) {
+      console.error("Error accessing camera:", error);
+      setCameraStatus("denied");
+    }
+  }, [cameraStatus, toast]);
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setCameraStatus("idle");
+  };
+
   useEffect(() => {
-    const getCameraPermission = async () => {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        console.error("Camera not supported by this browser.");
-        setHasCameraPermission(false);
-        toast({
-          variant: "destructive",
-          title: "Camera Not Supported",
-          description: "Your browser does not support camera access.",
-        });
-        return;
-      }
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        setHasCameraPermission(true);
-      } catch (error) {
-        console.error("Error accessing camera:", error);
-        setHasCameraPermission(false);
-        // The toast is good, but the main UI should reflect the state.
-      }
-    };
-
-    getCameraPermission();
-
     return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach((track) => track.stop());
-      }
+      stopCamera();
     };
-  }, [toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleTakePicture = () => {
-    if (videoRef.current && canvasRef.current) {
+    if (videoRef.current && canvasRef.current && cameraStatus === 'streaming') {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       canvas.width = video.videoWidth;
@@ -106,6 +117,47 @@ export default function EmotionCaptureCard({
       }
     }
   };
+
+  const renderCameraState = () => {
+    switch(cameraStatus) {
+      case 'idle':
+        return (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary p-4 text-center">
+            <VideoOff className="size-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">Camera is off. Click below to start.</p>
+          </div>
+        );
+      case 'requesting':
+        return (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 p-4 text-center">
+            <LoaderCircle className="size-10 animate-spin text-primary mb-4" />
+            <p className="text-white">Requesting camera access...</p>
+          </div>
+        );
+      case 'denied':
+        return (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 p-4 text-center">
+              <ShieldAlert className="size-16 text-destructive mb-4" />
+              <h3 className="text-xl font-bold text-white">Camera Access Denied</h3>
+              <p className="text-md text-muted-foreground mt-2 max-w-sm">
+                To use this feature, you must allow camera access. Please click the camera icon in your browser&apos;s address bar, grant permission, and then click &quot;Try Again&quot;.
+              </p>
+            </div>
+        );
+      case 'error':
+        return (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/20 p-4 text-center">
+            <ShieldAlert className="size-16 text-destructive mb-4" />
+            <h3 className="text-xl font-bold text-destructive-foreground">Camera Not Supported</h3>
+            <p className="text-md text-muted-foreground mt-2">
+              It seems your browser does not support camera access.
+            </p>
+          </div>
+        );
+      case 'streaming':
+        return null;
+    }
+  }
 
   return (
     <Card className="flex flex-col">
@@ -127,22 +179,9 @@ export default function EmotionCaptureCard({
             autoPlay
             playsInline
             muted
-            className="w-full h-full object-cover"
+            className={`w-full h-full object-cover ${cameraStatus !== 'streaming' ? 'hidden' : ''}`}
           />
-          {hasCameraPermission === false && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 p-4 text-center">
-              <ShieldAlert className="size-16 text-destructive mb-4" />
-              <h3 className="text-xl font-bold text-white">Camera Access Denied</h3>
-              <p className="text-md text-muted-foreground mt-2">
-                EmotiGuard needs camera access. Please grant permission in your browser's address bar and refresh the page.
-              </p>
-            </div>
-          )}
-           {hasCameraPermission === null && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                <LoaderCircle className="size-10 animate-spin text-primary" />
-            </div>
-          )}
+          {renderCameraState()}
         </div>
         <canvas ref={canvasRef} className="hidden" />
       </CardContent>
@@ -168,19 +207,37 @@ export default function EmotionCaptureCard({
             </div>
           ) : (
             <span className="text-muted-foreground">
-              Scan your face to see results
+              {cameraStatus === 'streaming' ? 'Ready to scan' : 'Start camera to begin'}
             </span>
           )}
         </div>
-        <Button
-          onClick={handleTakePicture}
-          disabled={!hasCameraPermission || isLoading}
-          className="w-full"
-        >
-          <ScanFace className="mr-2" />
-          {isLoading ? "Scanning..." : "Scan Emotion"}
-        </Button>
+
+        {cameraStatus === 'streaming' ? (
+           <div className="flex w-full gap-2">
+             <Button
+                onClick={handleTakePicture}
+                disabled={isLoading}
+                className="w-full"
+              >
+                <ScanFace className="mr-2" />
+                {isLoading ? "Scanning..." : "Scan Emotion"}
+              </Button>
+              <Button onClick={stopCamera} variant="outline" className="shrink-0">
+                <VideoOff />
+              </Button>
+           </div>
+        ) : (
+          <Button
+            onClick={startCamera}
+            disabled={cameraStatus === 'requesting' || cameraStatus === 'error'}
+            className="w-full"
+          >
+            {cameraStatus === 'denied' ? <><ShieldAlert className="mr-2" />Try Again</> : <><Video className="mr-2" />Start Camera</>}
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );
 }
+
+    
