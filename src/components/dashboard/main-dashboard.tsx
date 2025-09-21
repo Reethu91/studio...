@@ -66,13 +66,6 @@ export default function MainDashboard() {
     }
     setIsLoading(true);
     try {
-      // AI call to set the rule
-      await personalizeEncryptionRules({
-        userId: "demo-user",
-        dataType: "message",
-        requiredEmotion: encryptionEmotion,
-      });
-
       // Mock encryption
       const mockEncrypted = `emotiguard-v1::${btoa(
         JSON.stringify({
@@ -91,7 +84,7 @@ export default function MainDashboard() {
       toast({
         variant: "destructive",
         title: "Encryption Error",
-        description: "Could not set encryption rule. Please try again.",
+        description: "Could not encrypt the message. Please try again.",
       });
     } finally {
       setIsLoading(false);
