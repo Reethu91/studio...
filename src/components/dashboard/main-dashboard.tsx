@@ -3,7 +3,6 @@
 import { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { recognizeUserEmotion, RecognizeUserEmotionOutput } from "@/ai/flows/recognize-user-emotion";
-import { personalizeEncryptionRules } from "@/ai/flows/personalize-encryption-rules";
 import EmotionCaptureCard from "./emotion-capture-card";
 import SecureDataCard from "./secure-data-card";
 import AccessLogCard from "./access-log-card";
@@ -132,7 +131,7 @@ export default function MainDashboard() {
         toast({
           variant: "destructive",
           title: "Decryption Failed",
-          description: "Emotion mismatch. Access denied.",
+          description: `Emotion mismatch. Required: ${requiredEmotion}, Detected: ${emotionResult.emotion}. Access denied.`,
         });
       }
     } catch (error) {
