@@ -24,7 +24,7 @@ export default function MainDashboard() {
   const [accessLog, setAccessLog] = useState<AccessLogEntry[]>([]);
 
   // State for the secure data card
-  const [plainText, setPlainText] = useState("");
+  const [plainText, setPlainText] = useState("The launch codes are 0000-0000-0000-0001.");
   const [encryptedText, setEncryptedText] = useState("");
   const [encryptionEmotion, setEncryptionEmotion] = useState("Happy");
 
