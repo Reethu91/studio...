@@ -26,6 +26,7 @@ import {
   Meh,
   Annoyed,
   Laugh,
+  ShieldAlert,
 } from "lucide-react";
 import type { RecognizeUserEmotionOutput } from "@/ai/flows/recognize-user-emotion";
 import { useToast } from "@/hooks/use-toast";
@@ -59,6 +60,7 @@ export default function EmotionCaptureCard({
   useEffect(() => {
     const getCameraPermission = async () => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error("Camera not supported by this browser.");
         setHasCameraPermission(false);
         toast({
           variant: "destructive",
@@ -69,14 +71,18 @@ export default function EmotionCaptureCard({
       }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        setHasCameraPermission(true);
-
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
+        setHasCameraPermission(true);
       } catch (error) {
         console.error("Error accessing camera:", error);
         setHasCameraPermission(false);
+        toast({
+          variant: "destructive",
+          title: "Camera Access Denied",
+          description: "Please enable camera permissions in your browser settings.",
+        });
       }
     };
 
@@ -128,14 +134,12 @@ export default function EmotionCaptureCard({
             className="w-full h-full object-cover"
           />
           {hasCameraPermission === false && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50 p-4">
-              <Alert variant="destructive">
-                <Camera className="size-4" />
-                <AlertTitle>Camera Access Denied</AlertTitle>
-                <AlertDescription>
-                  Please grant camera permissions in your browser settings to use this feature.
-                </AlertDescription>
-              </Alert>
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 p-4 text-center">
+              <ShieldAlert className="size-12 text-destructive mb-4" />
+              <h3 className="text-lg font-bold text-destructive-foreground">Camera Access Denied</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Please grant camera permissions in your browser settings to use this feature.
+              </p>
             </div>
           )}
            {hasCameraPermission === null && (
