@@ -77,12 +77,8 @@ export default function EmotionCaptureCard({
       } catch (error) {
         console.error("Error accessing camera:", error);
         setHasCameraPermission(false);
-        toast({
-          variant: "destructive",
-          title: "Camera Access Denied",
-          description:
-            "Please enable camera permissions in your browser settings to use this feature.",
-        });
+        // We show the alert in the UI, so a toast is redundant if the user explicitly denies.
+        // The toast is still useful for the general "camera not supported" case.
       }
     };
 
@@ -134,12 +130,12 @@ export default function EmotionCaptureCard({
             className="w-full h-full object-cover"
           />
           {hasCameraPermission === false && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-              <Alert variant="destructive" className="w-auto">
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50 p-4">
+              <Alert variant="destructive">
                 <Camera className="size-4" />
-                <AlertTitle>Camera Access Required</AlertTitle>
+                <AlertTitle>Camera Access Denied</AlertTitle>
                 <AlertDescription>
-                  Please allow camera access to use this feature.
+                  Please enable camera permissions in your browser settings to use this feature.
                 </AlertDescription>
               </Alert>
             </div>
