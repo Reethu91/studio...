@@ -77,8 +77,6 @@ export default function EmotionCaptureCard({
       } catch (error) {
         console.error("Error accessing camera:", error);
         setHasCameraPermission(false);
-        // We show the alert in the UI, so a toast is redundant if the user explicitly denies.
-        // The toast is still useful for the general "camera not supported" case.
       }
     };
 
@@ -135,7 +133,7 @@ export default function EmotionCaptureCard({
                 <Camera className="size-4" />
                 <AlertTitle>Camera Access Denied</AlertTitle>
                 <AlertDescription>
-                  Please enable camera permissions in your browser settings to use this feature.
+                  Please grant camera permissions in your browser settings to use this feature.
                 </AlertDescription>
               </Alert>
             </div>
